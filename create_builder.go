@@ -2,7 +2,6 @@ package pack
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Masterminds/semver"
@@ -22,8 +21,6 @@ type CreateBuilderOptions struct {
 	NoPull        bool
 }
 
-// pack create-builder
-// create new builder
 func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) error {
 	if err := validateBuilderConfig(opts.BuilderConfig); err != nil {
 		return errors.Wrap(err, "invalid builder config")
@@ -37,38 +34,6 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 	if err != nil {
 		return errors.Wrap(err, "fetch build image")
 	}
-
-	runImage, err := c.imageFetcher.Fetch(ctx, opts.BuilderConfig.Stack.RunImage, !opts.Publish, !opts.NoPull)
-	if err != nil {
-		return errors.Wrapf(err, "fetching run image %s", style.Symbol(opts.BuilderConfig.Stack.RunImage))
-	}
-
-	// validate build <-> run (builder.toml) -- strict
-
-	// TODO: replace with GetLabel
-	mixinsData, err := baseImage.Label(builder.MixinsLabel)
-	if err != nil {
-		return err
-	}
-	var buildMixins []string
-	if mixinsData != "" {
-		if err := json.Unmarshal([]byte(mixinsData), &buildMixins); err != nil {
-			return err
-		}
-	}
-
-	// TODO: replace with GetLabel
-	mixinsData, err = runImage.Label(builder.MixinsLabel)
-	if err != nil {
-		return err
-	}
-	var runMixins []string
-	if mixinsData != "" {
-		if err := json.Unmarshal([]byte(mixinsData), &runMixins); err != nil {
-			return err
-		}
-	}
-	mixins := mergeMixins(buildMixins, runMixins)
 
 	c.logger.Debugf("Creating builder %s from build-image %s", style.Symbol(opts.BuilderName), style.Symbol(baseImage.Name()))
 	bldr, err := builder.New(baseImage, opts.BuilderName)
@@ -85,8 +50,6 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 			style.Symbol(bldr.StackID),
 		)
 	}
-
-	bldr.SetMixins(mixins)
 
 	lifecycle, err := c.fetchLifecycle(ctx, opts.BuilderConfig.Lifecycle)
 	if err != nil {
@@ -125,21 +88,6 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 	bldr.SetStack(opts.BuilderConfig.Stack)
 
 	return bldr.Save(c.logger)
-}
-
-func mergeMixins(buildMixins []string, runMixins []string) []string {
-	set := map[string]interface{}{}
-	for _, m := range buildMixins {
-		set[m] = nil
-	}
-	for _, m := range runMixins {
-		set[m] = nil
-	}
-	var merged []string
-	for m := range set {
-		merged = append(merged, m)
-	}
-	return merged
 }
 
 func validateBuildpack(bp dist.Buildpack, source, expectedID, expectedBPVersion string) error {

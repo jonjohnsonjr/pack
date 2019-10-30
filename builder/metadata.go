@@ -11,9 +11,9 @@ const (
 type BuildpackLayers map[string]map[string]BuildpackLayerInfo
 
 type BuildpackLayerInfo struct {
-	LayerDiffID string     `json:"layerDiffID"`
-	Order       dist.Order `json:"order,omitempty"`
-	// TODO: mixins?
+	LayerDiffID string       `json:"layerDiffID"`
+	Order       dist.Order   `json:"order,omitempty"`
+	Stacks      []dist.Stack `json:"stacks,omitempty"`
 }
 
 type Metadata struct {

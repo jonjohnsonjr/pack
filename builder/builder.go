@@ -10,9 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -216,11 +214,6 @@ func (b *Builder) SetStack(stackConfig StackConfig) {
 	}
 }
 
-// TODO: Test effect of this in Save()
-func (b *Builder) SetMixins(mixins []string) {
-	b.mixins = mixins
-}
-
 func (b *Builder) Save(logger logging.Logger) error {
 	resolvedOrder, err := processOrder(b.metadata.Buildpacks, b.order)
 	if err != nil {
@@ -303,9 +296,10 @@ func (b *Builder) Save(logger logging.Logger) error {
 		bpLayers[bpInfo.ID][bpInfo.Version] = BuildpackLayerInfo{
 			LayerDiffID: diffID.String(),
 			Order:       bp.Descriptor().Order,
+			Stacks:      bp.Descriptor().Stacks,
 		}
 
-		if err := validateBuildpackMixins(bp.Descriptor(), b.StackID, b.mixins); err != nil {
+		if err := dist.ValidateBuildpackMixins(bp.Descriptor(), b.StackID, b.Mixins()); err != nil {
 			return err
 		}
 	}
@@ -371,43 +365,6 @@ func (b *Builder) Save(logger logging.Logger) error {
 	}
 
 	return b.image.Save()
-}
-
-func validateBuildpackMixins(bp dist.BuildpackDescriptor, builderStackID string, builderMixins []string) error {
-	avail := map[string]interface{}{}
-	for _, m := range builderMixins {
-		avail[m] = nil
-	}
-
-	if len(bp.Stacks) == 0 {
-		return nil // Order buildpack, no validation required
-	}
-
-	bpMixins, err := findBuildpackMixins(bp, builderStackID)
-	if err != nil {
-		return err
-	}
-
-	var missing []string
-	for _, m := range bpMixins {
-		if _, ok := avail[m]; !ok {
-			missing = append(missing, m)
-		}
-	}
-	sort.Strings(missing)
-	if len(missing) > 0 {
-		return fmt.Errorf("buildpack %s missing required mixin(s): %s", style.Symbol(bp.Info.ID+"@"+bp.Info.Version), strings.Join(missing, ", "))
-	}
-	return nil
-}
-
-func findBuildpackMixins(bp dist.BuildpackDescriptor, stackID string) ([]string, error) {
-	for _, s := range bp.Stacks {
-		if s.ID == stackID {
-			return s.Mixins, nil
-		}
-	}
-	return nil, fmt.Errorf("buildpack %s does not support stack %s", style.Symbol(bp.Info.ID+"@"+bp.Info.Version), style.Symbol(stackID))
 }
 
 func processOrder(buildpacks []BuildpackMetadata, order dist.Order) (dist.Order, error) {

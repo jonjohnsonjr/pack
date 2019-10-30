@@ -57,17 +57,14 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 			fakeBuildImage = fakes.NewImage("some/build-image", "", nil)
 			h.AssertNil(t, fakeBuildImage.SetLabel("io.buildpacks.stack.id", "some.stack.id"))
-			h.AssertNil(t, fakeBuildImage.SetLabel("io.buildpacks.stack.mixins", `["some-mixin", "build:stage-mixin"]`))
 			h.AssertNil(t, fakeBuildImage.SetEnv("CNB_USER_ID", "1234"))
 			h.AssertNil(t, fakeBuildImage.SetEnv("CNB_GROUP_ID", "4321"))
 
 			fakeRunImage = fakes.NewImage("some/run-image", "", nil)
 			h.AssertNil(t, fakeRunImage.SetLabel("io.buildpacks.stack.id", "some.stack.id"))
-			h.AssertNil(t, fakeRunImage.SetLabel("io.buildpacks.stack.mixins", `["some-mixin", "run:stage-mixin"]`))
 
 			fakeRunImageMirror = fakes.NewImage("localhost:5000/some-run-image", "", nil)
 			h.AssertNil(t, fakeRunImageMirror.SetLabel("io.buildpacks.stack.id", "some.stack.id"))
-			h.AssertNil(t, fakeRunImageMirror.SetLabel("io.buildpacks.stack.mixins", `["some-mixin", "run:stage-mixin"]`))
 
 			imageFetcher = ifakes.NewFakeImageFetcher()
 			imageFetcher.LocalImages["some/build-image"] = fakeBuildImage
@@ -117,7 +114,7 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it.After(func() {
-			// mockController.Finish()
+			mockController.Finish()
 			h.AssertNil(t, os.RemoveAll(tmpDir))
 		})
 
@@ -303,10 +300,6 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 				assertTarHasFile(t, layerTar, "/cnb/lifecycle/exporter")
 				assertTarHasFile(t, layerTar, "/cnb/lifecycle/cacher")
 				assertTarHasFile(t, layerTar, "/cnb/lifecycle/launcher")
-			})
-
-			it("should set mixin metadata", func() {
-				h.AssertSliceContains(t, bldr.Mixins(), "some-mixin", "build:stage-mixin", "run:stage-mixin")
 			})
 		})
 

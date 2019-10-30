@@ -34,6 +34,10 @@ type BuildpackDescriptor struct {
 	Order  Order         `toml:"order"`
 }
 
+func (b BuildpackDescriptor) String() string {
+	return b.Info.String()
+}
+
 //go:generate mockgen -package testmocks -destination testmocks/buildpack.go github.com/buildpack/pack/dist Buildpack
 type Buildpack interface {
 	Blob
@@ -43,6 +47,13 @@ type Buildpack interface {
 type BuildpackInfo struct {
 	ID      string `toml:"id" json:"id"`
 	Version string `toml:"version" json:"version,omitempty"`
+}
+
+func (b BuildpackInfo) String() string {
+	if b.Version != "" {
+		return b.ID + "@" + b.Version
+	}
+	return b.ID
 }
 
 type Stack struct {
