@@ -59,6 +59,7 @@ func main() {
 	rootCmd.AddCommand(commands.Build(logger, cfg, &packClient))
 	rootCmd.AddCommand(commands.Run(logger, cfg, &packClient))
 	rootCmd.AddCommand(commands.Rebase(logger, cfg, &packClient))
+	rootCmd.AddCommand(commands.Land(logger, cfg, &packClient))
 	rootCmd.AddCommand(commands.InspectImage(logger, &cfg, &packClient))
 
 	rootCmd.AddCommand(commands.CreateBuilder(logger, &packClient))
