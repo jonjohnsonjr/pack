@@ -8,9 +8,10 @@ import (
 	"github.com/buildpack/pack/style"
 )
 
-func ValidateBuildpackMixins(bp BuildpackDescriptor, builderStackID string, builderMixins []string) error {
+// TODO: Move to SupportsStack()
+func ValidateBuildpackMixins(bp BuildpackDescriptor, builderStackID string, providedMixins []string, ignoreRunOnly bool) error {
 	avail := map[string]interface{}{}
-	for _, m := range builderMixins {
+	for _, m := range providedMixins {
 		avail[m] = nil
 	}
 
@@ -25,7 +26,8 @@ func ValidateBuildpackMixins(bp BuildpackDescriptor, builderStackID string, buil
 
 	var missing []string
 	for _, m := range bpMixins {
-		if _, ok := avail[m]; !strings.HasPrefix(m, "run:") && !ok {
+		ignored := ignoreRunOnly && strings.HasPrefix(m, "run:")
+		if _, ok := avail[m]; !ignored && !ok {
 			missing = append(missing, m)
 		}
 	}
@@ -56,9 +58,6 @@ func ValidateStackMixins(buildImageName string, buildImageMixins []string, runIm
 		return err
 	}
 
-	if err := validateMissing(bMixins, rMixins, buildImageName); err != nil {
-		return err
-	}
 	if err := validateMissing(rMixins, bMixins, runImageName); err != nil {
 		return err
 	}
@@ -93,9 +92,9 @@ func mixinSet(mixins []string, imageName string, run bool) (map[string]interface
 	return set, nil
 }
 
-func validateMissing(actual, expected map[string]interface{}, actualImageName string) error {
+func validateMissing(actual, required map[string]interface{}, actualImageName string) error {
 	var missing []string
-	for m := range expected {
+	for m := range required {
 		if _, ok := actual[m]; !ok {
 			missing = append(missing, m)
 		}

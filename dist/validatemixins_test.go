@@ -18,36 +18,78 @@ func TestMixinValidation(t *testing.T) {
 
 func testMixinValidation(t *testing.T, when spec.G, it spec.S) {
 	when("#ValidateBuildpackMixins", func() {
-		it("ignores run-only mixins", func() {
-			bp := BuildpackDescriptor{
-				Info: BuildpackInfo{
-					ID:      "some.buildpack.id",
-					Version: "some.buildpack.version",
-				},
-				Stacks: []Stack{{
-					ID:     "some.stack.id",
-					Mixins: []string{"mixinA", "build:mixinB", "run:mixinD"},
-				}},
-			}
+		when("not validating against run image mixins", func() {
+			it("ignores run-only mixins", func() {
+				bp := BuildpackDescriptor{
+					Info: BuildpackInfo{
+						ID:      "some.buildpack.id",
+						Version: "some.buildpack.version",
+					},
+					Stacks: []Stack{{
+						ID:     "some.stack.id",
+						Mixins: []string{"mixinA", "build:mixinB", "run:mixinD"},
+					}},
+				}
 
-			h.AssertNil(t, ValidateBuildpackMixins(bp, "some.stack.id", []string{"mixinA", "build:mixinB", "mixinC"}))
+				providedMixins := []string{"mixinA", "build:mixinB", "mixinC"}
+				h.AssertNil(t, ValidateBuildpackMixins(bp, "some.stack.id", providedMixins, true))
+			})
+
+			it("returns an error with any missing (and non-ignored) mixins", func() {
+				bp := BuildpackDescriptor{
+					Info: BuildpackInfo{
+						ID:      "some.buildpack.id",
+						Version: "some.buildpack.version",
+					},
+					Stacks: []Stack{{
+						ID:     "some.stack.id",
+						Mixins: []string{"mixinX", "mixinY", "run:mixinZ"},
+					}},
+				}
+
+				providedMixins := []string{"mixinA", "mixinB"}
+				err := ValidateBuildpackMixins(bp, "some.stack.id", providedMixins, true)
+
+				h.AssertError(t, err, "buildpack 'some.buildpack.id@some.buildpack.version' requires missing mixin(s): mixinX, mixinY")
+			})
 		})
 
-		it("returns an error with any missing mixins", func() {
-			bp := BuildpackDescriptor{
-				Info: BuildpackInfo{
-					ID:      "some.buildpack.id",
-					Version: "some.buildpack.version",
-				},
-				Stacks: []Stack{{
-					ID:     "some.stack.id",
-					Mixins: []string{"mixinX", "mixinY"},
-				}},
-			}
+		when("validating against run image mixins", func() {
+			it("requires run-only mixins", func() {
+				bp := BuildpackDescriptor{
+					Info: BuildpackInfo{
+						ID:      "some.buildpack.id",
+						Version: "some.buildpack.version",
+					},
+					Stacks: []Stack{{
+						ID:     "some.stack.id",
+						Mixins: []string{"mixinA", "build:mixinB", "run:mixinD"},
+					}},
+				}
 
-			err := ValidateBuildpackMixins(bp, "some.stack.id", []string{"mixinA", "mixinB"})
+				providedMixins := []string{"mixinA", "build:mixinB", "mixinC", "run:mixinD"}
 
-			h.AssertError(t, err, "buildpack 'some.buildpack.id@some.buildpack.version' requires missing mixin(s): mixinX, mixinY")
+				h.AssertNil(t, ValidateBuildpackMixins(bp, "some.stack.id", providedMixins, false))
+			})
+
+			it("returns an error with any missing mixins", func() {
+				bp := BuildpackDescriptor{
+					Info: BuildpackInfo{
+						ID:      "some.buildpack.id",
+						Version: "some.buildpack.version",
+					},
+					Stacks: []Stack{{
+						ID:     "some.stack.id",
+						Mixins: []string{"mixinX", "mixinY", "run:mixinZ"},
+					}},
+				}
+
+				providedMixins := []string{"mixinA", "mixinB"}
+
+				err := ValidateBuildpackMixins(bp, "some.stack.id", providedMixins, false)
+
+				h.AssertError(t, err, "buildpack 'some.buildpack.id@some.buildpack.version' requires missing mixin(s): mixinX, mixinY, run:mixinZ")
+			})
 		})
 
 		it("returns an error when buildpack does not support stack", func() {
@@ -62,7 +104,7 @@ func testMixinValidation(t *testing.T, when spec.G, it spec.S) {
 				}},
 			}
 
-			err := ValidateBuildpackMixins(bp, "some.nonexistent.stack.id", []string{"mixinA"})
+			err := ValidateBuildpackMixins(bp, "some.nonexistent.stack.id", []string{"mixinA"}, false)
 
 			h.AssertError(t, err, "buildpack 'some.buildpack.id@some.buildpack.version' does not support stack 'some.nonexistent.stack.id")
 		})
@@ -76,7 +118,7 @@ func testMixinValidation(t *testing.T, when spec.G, it spec.S) {
 				Stacks: []Stack{},
 			}
 
-			h.AssertNil(t, ValidateBuildpackMixins(bp, "some.stack.id", []string{"mixinA"}))
+			h.AssertNil(t, ValidateBuildpackMixins(bp, "some.stack.id", []string{"mixinA"}, false))
 		})
 	})
 
@@ -88,13 +130,11 @@ func testMixinValidation(t *testing.T, when spec.G, it spec.S) {
 			h.AssertNil(t, ValidateStackMixins("some/build", buildMixins, "some/run", runMixins))
 		})
 
-		it("returns an error with any missing build image mixins", func() {
-			buildMixins := []string{}
+		it("allows extraneous run image mixins", func() {
+			buildMixins := []string{"mixinA"}
 			runMixins := []string{"mixinA", "mixinB"}
 
-			err := ValidateStackMixins("some/build", buildMixins, "some/run", runMixins)
-
-			h.AssertError(t, err, "'some/build' missing required mixin(s): mixinA, mixinB")
+			h.AssertNil(t, ValidateStackMixins("some/build", buildMixins, "some/run", runMixins))
 		})
 
 		it("returns an error with any missing run image mixins", func() {

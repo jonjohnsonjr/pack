@@ -762,6 +762,12 @@ func testBuild(t *testing.T, when spec.G, it spec.S) {
 					})
 				})
 			})
+
+			when("buildpack mixins are not satisfied", func() {
+				it("returns an error", func() {
+
+				})
+			})
 		})
 
 		when("Env option", func() {

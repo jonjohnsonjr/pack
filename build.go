@@ -338,7 +338,7 @@ func (c *Client) createEphemeralBuilder(rawBuilderImage imgutil.Image, env map[s
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid builder %s", style.Symbol(origBuilderName))
 	}
-	
+
 	bldr.SetEnv(env)
 	for _, bp := range buildpacks {
 		bpInfo := bp.Descriptor().Info

@@ -57,6 +57,7 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 			fakeBuildImage = fakes.NewImage("some/build-image", "", nil)
 			h.AssertNil(t, fakeBuildImage.SetLabel("io.buildpacks.stack.id", "some.stack.id"))
+			h.AssertNil(t, fakeBuildImage.SetLabel("io.buildpacks.stack.mixins", `["mixinA", "mixinB"]`))
 			h.AssertNil(t, fakeBuildImage.SetEnv("CNB_USER_ID", "1234"))
 			h.AssertNil(t, fakeBuildImage.SetEnv("CNB_GROUP_ID", "4321"))
 
@@ -172,21 +173,21 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("validating the run image config", func() {
-			it.Pend("should fail when the stack ID from the builder config does not match the stack ID from the run image", func() {
+			it("should fail when the stack ID from the builder config does not match the stack ID from the run image", func() {
 				h.AssertNil(t, fakeRunImage.SetLabel("io.buildpacks.stack.id", "other.stack.id"))
 
 				err := subject.CreateBuilder(context.TODO(), opts)
 				h.AssertError(t, err, "stack 'some.stack.id' from builder config is incompatible with stack 'other.stack.id' from run image 'some/run-image'")
 			})
 
-			it.Pend("should fail when the stack ID from the builder config does not match the stack ID from the run image mirrors", func() {
+			it("should fail when the stack ID from the builder config does not match the stack ID from the run image mirrors", func() {
 				h.AssertNil(t, fakeRunImageMirror.SetLabel("io.buildpacks.stack.id", "other.stack.id"))
 
 				err := subject.CreateBuilder(context.TODO(), opts)
 				h.AssertError(t, err, "stack 'some.stack.id' from builder config is incompatible with stack 'other.stack.id' from run image 'localhost:5000/some-run-image'")
 			})
 
-			it.Pend("should warn when the run image cannot be found", func() {
+			it("should warn when the run image cannot be found", func() {
 				delete(imageFetcher.LocalImages, "some/run-image")
 
 				err := subject.CreateBuilder(context.TODO(), opts)
@@ -248,6 +249,17 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 				err := subject.CreateBuilder(context.TODO(), opts)
 				h.AssertNil(t, err)
+			})
+		})
+
+		when("buildpack mixins are not satisfied", func() {
+			it.Before(func() {
+				h.AssertNil(t, fakeBuildImage.SetLabel("io.buildpacks.stack.mixins", ""))
+			})
+
+			it("should return an error", func() {
+				err := subject.CreateBuilder(context.TODO(), opts)
+				h.AssertError(t, err, "invalid build image 'some/build-image': buildpack 'bp.one@1.2.3' requires missing mixin(s): mixinA, mixinB")
 			})
 		})
 

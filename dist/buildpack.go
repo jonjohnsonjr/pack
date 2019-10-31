@@ -100,7 +100,7 @@ func validateDescriptor(bpd BuildpackDescriptor) error {
 	if len(bpd.Order) == 0 && len(bpd.Stacks) == 0 {
 		return errors.Errorf(
 			"buildpack %s: must have either %s or an %s defined",
-			style.Symbol(bpd.Info.ID+"@"+bpd.Info.Version),
+			style.Symbol(bpd.String()),
 			style.Symbol("stacks"),
 			style.Symbol("order"),
 		)
@@ -109,7 +109,7 @@ func validateDescriptor(bpd BuildpackDescriptor) error {
 	if len(bpd.Order) >= 1 && len(bpd.Stacks) >= 1 {
 		return errors.Errorf(
 			"buildpack %s: cannot have both %s and an %s defined",
-			style.Symbol(bpd.Info.ID+"@"+bpd.Info.Version),
+			style.Symbol(bpd.String()),
 			style.Symbol("stacks"),
 			style.Symbol("order"),
 		)

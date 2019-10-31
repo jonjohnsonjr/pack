@@ -45,6 +45,7 @@ const (
 )
 
 type Builder struct {
+	baseImageName        string
 	image                imgutil.Image
 	lifecycle            Lifecycle
 	lifecycleDescriptor  LifecycleDescriptor
@@ -101,7 +102,8 @@ func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Bu
 		return nil, err
 	}
 
-	if newName != "" && img.Name() != newName {
+	baseName := img.Name()
+	if newName != "" && baseName != newName {
 		img.Rename(newName)
 	}
 
@@ -128,13 +130,14 @@ func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Bu
 	}
 
 	return &Builder{
-		image:    img,
-		metadata: metadata,
-		mixins:   mixins,
-		order:    order,
-		UID:      uid,
-		GID:      gid,
-		StackID:  stackID,
+		baseImageName: baseName,
+		image:         img,
+		metadata:      metadata,
+		mixins:        mixins,
+		order:         order,
+		UID:           uid,
+		GID:           gid,
+		StackID:       stackID,
 		lifecycleDescriptor: LifecycleDescriptor{
 			Info: LifecycleInfo{
 				Version: lifecycleVersion,
@@ -259,6 +262,10 @@ func (b *Builder) Save(logger logging.Logger) error {
 	}
 
 	for _, bp := range b.additionalBuildpacks {
+		if err := dist.ValidateBuildpackMixins(bp.Descriptor(), b.StackID, b.Mixins(), true); err != nil {
+			return errors.Wrapf(err, "invalid build image %s", style.Symbol(b.baseImageName))
+		}
+
 		bpLayerTar, err := dist.BuildpackLayer(tmpDir, b.UID, b.GID, bp)
 		if err != nil {
 			return err
@@ -266,18 +273,16 @@ func (b *Builder) Save(logger logging.Logger) error {
 
 		if err := b.image.AddLayer(bpLayerTar); err != nil {
 			return errors.Wrapf(err,
-				"adding layer tar for buildpack %s:%s",
-				style.Symbol(bp.Descriptor().Info.ID),
-				style.Symbol(bp.Descriptor().Info.Version),
+				"adding layer tar for buildpack %s",
+				style.Symbol(bp.Descriptor().String()),
 			)
 		}
 
 		diffID, err := dist.LayerDiffID(bpLayerTar)
 		if err != nil {
 			return errors.Wrapf(err,
-				"getting content hashes for buildpack %s:%s",
-				style.Symbol(bp.Descriptor().Info.ID),
-				style.Symbol(bp.Descriptor().Info.Version),
+				"getting content hashes for buildpack %s",
+				style.Symbol(bp.Descriptor().String()),
 			)
 		}
 
@@ -289,7 +294,7 @@ func (b *Builder) Save(logger logging.Logger) error {
 		if _, ok := bpLayers[bpInfo.ID][bpInfo.Version]; ok {
 			logger.Warnf(
 				"buildpack %s already exists on builder and will be overridden",
-				style.Symbol(bpInfo.ID+"@"+bpInfo.Version),
+				style.Symbol(bpInfo.String()),
 			)
 		}
 
@@ -297,10 +302,6 @@ func (b *Builder) Save(logger logging.Logger) error {
 			LayerDiffID: diffID.String(),
 			Order:       bp.Descriptor().Order,
 			Stacks:      bp.Descriptor().Stacks,
-		}
-
-		if err := dist.ValidateBuildpackMixins(bp.Descriptor(), b.StackID, b.Mixins()); err != nil {
-			return err
 		}
 	}
 
@@ -417,8 +418,7 @@ func validateBuildpacks(stackID string, lifecycleDescriptor LifecycleDescriptor,
 	bpLookup := map[string]interface{}{}
 
 	for _, bp := range bps {
-		bpInfo := bp.Descriptor().Info
-		bpLookup[bpInfo.ID+"@"+bpInfo.Version] = nil
+		bpLookup[bp.Descriptor().String()] = nil
 	}
 
 	for _, bp := range bps {
@@ -427,7 +427,7 @@ func validateBuildpacks(stackID string, lifecycleDescriptor LifecycleDescriptor,
 		if !bpd.API.SupportsVersion(lifecycleDescriptor.API.BuildpackVersion) {
 			return fmt.Errorf(
 				"buildpack %s (Buildpack API version %s) is incompatible with lifecycle %s (Buildpack API version %s)",
-				style.Symbol(bpd.Info.ID+"@"+bpd.Info.Version),
+				style.Symbol(bpd.String()),
 				bpd.API.String(),
 				style.Symbol(lifecycleDescriptor.Info.Version.String()),
 				lifecycleDescriptor.API.BuildpackVersion.String(),
@@ -438,17 +438,17 @@ func validateBuildpacks(stackID string, lifecycleDescriptor LifecycleDescriptor,
 			if !bpd.SupportsStack(stackID) {
 				return fmt.Errorf(
 					"buildpack %s does not support stack %s",
-					style.Symbol(bpd.Info.ID+"@"+bpd.Info.Version),
+					style.Symbol(bpd.String()),
 					style.Symbol(stackID),
 				)
 			}
 		} else { // order buildpack
 			for _, g := range bpd.Order {
 				for _, r := range g.Group {
-					if _, ok := bpLookup[r.ID+"@"+r.Version]; !ok {
+					if _, ok := bpLookup[r.String()]; !ok {
 						return fmt.Errorf(
 							"buildpack %s not found on the builder",
-							style.Symbol(r.ID+"@"+r.Version),
+							style.Symbol(r.String()),
 						)
 					}
 				}
